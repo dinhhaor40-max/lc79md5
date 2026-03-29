@@ -32,7 +32,7 @@ function predictBridge(arr) {
 }
 
 function predictDiceMath(list) {
-  if (list.length < 10) return { predict: null, accuracy: 0 };
+  if (list.length < 20) return { predict: null, accuracy: 0 };
   let bestAcc = 0, bestRule = null;
   const formulas = [
     d => d[0] + d[1] + d[2],
@@ -138,7 +138,7 @@ export default async function handler(req, res) {
 
     // Tạo dự đoán mới nếu chưa có pending
     if (!pendingId) {
-      const ensemble = runEnsemble(list.slice(0, 60), history);
+      const ensemble = runEnsemble(list.slice(0, 200), history);
       pendingId = latestPhien + 1;
       pendingPredict = ensemble.predict;
       pendingAlgo = ensemble.algo;
