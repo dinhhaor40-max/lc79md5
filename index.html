@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dự Đoán Tài Xỉu</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0f0f1a;
+      color: #fff;
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 30px 16px;
+    }
+    .card {
+      background: linear-gradient(135deg, #1a1a2e, #16213e);
+      border: 1px solid #0f3460;
+      border-radius: 20px;
+      padding: 40px;
+      width: 340px;
+      text-align: center;
+      box-shadow: 0 0 40px rgba(0,255,200,0.1);
+      margin-bottom: 30px;
+    }
+    .title {
+      font-size: 22px;
+      font-weight: bold;
+      color: #00ffcc;
+      margin-bottom: 30px;
+      letter-spacing: 2px;
+    }
+    .phien { font-size: 13px; color: #888; margin-bottom: 6px; }
+    .phien span { color: #00ffcc; font-weight: bold; }
+    .ket-qua-label, .du-doan-label { font-size: 13px; color: #888; margin-top: 20px; margin-bottom: 6px; }
+    .ket-qua {
+      font-size: 36px; font-weight: bold;
+      padding: 10px 30px; border-radius: 12px;
+      display: inline-block; margin-bottom: 20px;
+    }
+    .tai { background: rgba(255,80,80,0.2); color: #ff5050; border: 2px solid #ff5050; }
+    .xiu { background: rgba(80,180,255,0.2); color: #50b4ff; border: 2px solid #50b4ff; }
+    .du-doan {
+      font-size: 42px; font-weight: bold;
+      padding: 14px 40px; border-radius: 16px;
+      display: inline-block;
+      animation: pulse 1s ease-in-out infinite alternate;
+    }
+    @keyframes pulse {
+      from { box-shadow: 0 0 10px currentColor; }
+      to { box-shadow: 0 0 30px currentColor; }
+    }
+    .status { margin-top: 24px; font-size: 12px; color: #555; }
+    .dot {
+      display: inline-block; width: 8px; height: 8px;
+      border-radius: 50%; background: #00ffcc;
+      margin-right: 6px; animation: blink 1s infinite;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; } 50% { opacity: 0.2; }
+    }
+    .new-badge {
+      display: none; background: #00ffcc; color: #000;
+      font-size: 11px; font-weight: bold;
+      padding: 2px 8px; border-radius: 20px;
+      margin-left: 8px; vertical-align: middle;
+    }
+
+    /* History table */
+    .history-wrap {
+      width: 100%;
+      max-width: 600px;
+    }
+    .history-title {
+      font-size: 16px; font-weight: bold;
+      color: #00ffcc; margin-bottom: 12px;
+      letter-spacing: 1px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #1a1a2e;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    thead tr { background: #0f3460; }
+    th {
+      padding: 12px 10px; font-size: 13px;
+      color: #00ffcc; text-align: center;
+    }
+    td {
+      padding: 10px; font-size: 13px;
+      text-align: center; border-bottom: 1px solid #1e2a4a;
+    }
+    tr:last-child td { border-bottom: none; }
+    .dung { color: #00ff88; font-weight: bold; }
+    .sai { color: #ff5050; font-weight: bold; }
+    .empty { color: #555; font-size: 13px; padding: 20px; }
+    .waiting { color: #ffcc00; font-weight: bold; animation: blink 1s infinite; }
+    tr.current-row { background: rgba(0,255,200,0.05); border-left: 3px solid #00ffcc; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="title">🎲 TÀI XỈU LIVE</div>
+    <div class="phien">Phiên: <span id="phien">--</span> <span class="new-badge" id="badge">MỚI</span></div>
+    <div class="ket-qua-label">Kết quả</div>
+    <div class="ket-qua" id="ket-qua">--</div>
+    <div class="du-doan-label">Dự đoán phiên tới</div>
+    <div class="du-doan tai" id="du-doan">--</div>
+    <div class="status"><span class="dot"></span>Đang theo dõi...</div>
+  </div>
+
+  <div class="history-wrap">
+    <div class="history-title">📋 Lịch sử</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Phiên</th>
+          <th>Dự đoán</th>
+          <th>Kết quả</th>
+          <th>Đúng/Sai</th>
+        </tr>
+      </thead>
+      <tbody id="history-body">
+        <tr><td colspan="4" class="empty">Chưa có dữ liệu...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    const BASE = 'https://lc79md5-jade.vercel.app';
+    let lastPhien = null;
+    let currentDuDoan = null;
+    let history = [];
+
+    // Load 50 phiên lịch sử từ server khi mở trang
+    async function loadHistory() {
+      try {
+        const res = await fetch(BASE + '/api/history');
+        const data = await res.json();
+        history = data.map(h => ({
+          phien: h.phien,
+          duDoan: h.duDoan,
+          ketQua: h.ketQua || '⏳',
+          dungSai: h.dungSai ? (h.dungSai === 'Đúng' ? '✅ Đúng' : '❌ Sai') : '--'
+        }));
+        renderHistory();
+      } catch (e) {
+        console.error('Lỗi load history:', e);
+      }
+    }
+
+    async function fetchData() {
+      try {
+        // Gọi tracker để cập nhật history trên server
+        const res = await fetch(BASE + '/api/tracker?_=' + Date.now());
+        const data = await res.json();
+        const current = data.current;
+
+        if (current.Phien !== lastPhien) {
+          lastPhien = current.Phien;
+          currentDuDoan = current.Du_doan;
+
+          // Reload history từ server
+          await loadHistory();
+
+          const badge = document.getElementById('badge');
+          badge.style.display = 'inline';
+          setTimeout(() => badge.style.display = 'none', 3000);
+        }
+
+        document.getElementById('phien').textContent = current.Phien;
+
+        const ketQua = document.getElementById('ket-qua');
+        ketQua.textContent = current.Ket_qua;
+        ketQua.className = 'ket-qua ' + (current.Ket_qua === 'Tài' ? 'tai' : 'xiu');
+
+        const duDoan = document.getElementById('du-doan');
+        duDoan.textContent = current.Du_doan;
+        duDoan.className = 'du-doan ' + (current.Du_doan === 'Tài' ? 'tai' : 'xiu');
+
+        renderHistory();
+
+      } catch (e) {
+        console.error('Lỗi:', e);
+      }
+    }
+
+    function renderHistory() {
+      const tbody = document.getElementById('history-body');
+      let rows = '';
+
+      // Hàng phiên hiện tại - đang chờ kết quả
+      if (lastPhien !== null && prevDuDoan !== null) {
+        rows += `
+          <tr class="current-row">
+            <td>${lastPhien}</td>
+            <td class="${prevDuDoan === 'Tài' ? 'tai' : 'xiu'}">${prevDuDoan}</td>
+            <td class="waiting">⏳ ĐỢI...</td>
+            <td class="waiting">--</td>
+          </tr>
+        `;
+      }
+
+      if (history.length === 0 && lastPhien === null) {
+        tbody.innerHTML = '<tr><td colspan="4" class="empty">Chưa có dữ liệu...</td></tr>';
+        return;
+      }
+
+      rows += history.map(h => `
+        <tr>
+          <td>${h.phien}</td>
+          <td class="${h.duDoan === 'Tài' ? 'tai' : 'xiu'}">${h.duDoan}</td>
+          <td class="${h.ketQua === 'Tài' ? 'tai' : 'xiu'}">${h.ketQua}</td>
+          <td class="${h.dungSai.includes('Đúng') ? 'dung' : 'sai'}">${h.dungSai}</td>
+        </tr>
+      `).join('');
+
+      tbody.innerHTML = rows;
+    }
+
+    fetchData();
+    setInterval(fetchData, 3000);
+    loadHistory();
+  </script>
+</body>
+</html>
