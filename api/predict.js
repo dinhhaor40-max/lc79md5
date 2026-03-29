@@ -141,16 +141,19 @@ export default async function handler(req, res) {
       const found = list.find(x => x.Phien === pendingId);
       if (found) {
         const actual = toTX(found.Ket_qua);
-        history.unshift({
-          phien: pendingId,
-          duDoan: pendingPredict,
-          ketQua: actual,
-          isCorrect: pendingPredict === actual,
-          wasReversed: isReversing,
-          algo: pendingAlgo,
-          time: new Date().toISOString()
-        });
-        if (history.length > 1000) history.pop();
+        // Kiểm tra chưa có trong history
+        if (!history.find(h => h.phien === pendingId)) {
+          history.unshift({
+            phien: pendingId,
+            duDoan: pendingPredict,
+            ketQua: actual,
+            isCorrect: pendingPredict === actual,
+            wasReversed: isReversing,
+            algo: pendingAlgo,
+            time: new Date().toISOString()
+          });
+          if (history.length > 1000) history.pop();
+        }
         pendingId = null;
         changed = true;
       }
