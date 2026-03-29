@@ -1,4 +1,4 @@
-const BIN_ID = process.env.JSONBIN_ID;
+const BIN_ID = process.env.JSONBIN_PREDICT_ID;
 const API_KEY = process.env.JSONBIN_KEY;
 const BIN_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 const SOURCE_API = 'https://lc79-server-production.up.railway.app/api/lichsu';
