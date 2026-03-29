@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LC79 - Dự Đoán AI</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: radial-gradient(circle at 10% 30%, #0a0f1e, #03060c);
+      font-family: 'Segoe UI', sans-serif;
+      color: #eef2ff;
+      min-height: 100vh;
+      padding: 24px 16px;
+    }
+    h1 {
+      text-align: center;
+      font-size: 1.8rem;
+      background: linear-gradient(145deg, #fff, #0ff, #c084fc);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      margin-bottom: 24px;
+    }
+    .dashboard {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      max-width: 700px;
+      margin: 0 auto 24px;
+    }
+    .card {
+      background: rgba(15,23,38,0.8);
+      border: 1px solid rgba(0,255,255,0.2);
+      border-radius: 24px;
+      padding: 20px;
+      text-align: center;
+    }
+    .card h3 { font-size: 13px; color: #88aacc; margin-bottom: 10px; }
+    .predict-val {
+      font-size: 3rem;
+      font-weight: 900;
+      letter-spacing: 2px;
+      animation: pulse 1.2s ease-in-out infinite alternate;
+    }
+    .tai { color: #ff5050; }
+    .xiu { color: #50b4ff; }
+    @keyframes pulse {
+      from { text-shadow: 0 0 8px currentColor; }
+      to { text-shadow: 0 0 24px currentColor; }
+    }
+    .win-rate {
+      font-size: 2.4rem;
+      font-weight: bold;
+      background: linear-gradient(135deg, gold, #ffaa44);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .algo-text { font-size: 12px; color: #6aa9ff; margin-top: 8px; }
+    .reverse-warn { color: #ff7b72; font-size: 12px; margin-top: 6px; font-weight: bold; }
+    .status-bar {
+      text-align: center;
+      font-size: 12px;
+      color: #555;
+      margin-bottom: 16px;
+    }
+    .dot {
+      display: inline-block; width: 8px; height: 8px;
+      border-radius: 50%; background: #00ffcc;
+      margin-right: 6px; animation: blink 1s infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+    .history-wrap { max-width: 700px; margin: 0 auto; }
+    .history-title {
+      font-size: 15px; font-weight: bold;
+      color: #00ffcc; margin-bottom: 12px;
+    }
+    table {
+      width: 100%; border-collapse: collapse;
+      background: rgba(15,23,38,0.8);
+      border-radius: 16px; overflow: hidden;
+    }
+    thead tr { background: #0f172a; }
+    th { padding: 12px 8px; font-size: 13px; color: #b9e2ff; text-align: center; }
+    td { padding: 10px 8px; font-size: 13px; text-align: center; border-bottom: 1px solid #1e2a4a; }
+    tr:last-child td { border-bottom: none; }
+    .dung { color: #00ff88; font-weight: bold; }
+    .sai { color: #ff5050; font-weight: bold; }
+    .waiting { color: #ffcc00; font-weight: bold; animation: blink 1s infinite; }
+    tr.current-row { background: rgba(0,255,200,0.05); }
+    .badge-rev {
+      background: #aa2eff; color: #fff;
+      font-size: 10px; padding: 1px 6px;
+      border-radius: 20px; margin-left: 4px;
+    }
+    @media(max-width:500px){ .dashboard{grid-template-columns:1fr;} }
+  </style>
+</head>
+<body>
+  <h1>⚡ LC79 · AI DỰ ĐOÁN ⚡</h1>
+
+  <div class="status-bar"><span class="dot"></span><span id="status">Đang kết nối...</span></div>
+
+  <div class="dashboard">
+    <div class="card">
+      <h3>🔮 DỰ ĐOÁN PHIÊN <span id="pending-id">--</span></h3>
+      <div id="predict-val" class="predict-val">--</div>
+      <div id="algo-text" class="algo-text"></div>
+      <div id="reverse-warn" class="reverse-warn" style="display:none">⚠️ CHẾ ĐỘ ĐẢO CHIỀU</div>
+    </div>
+    <div class="card">
+      <h3>📊 HIỆU SUẤT AI</h3>
+      <div id="win-rate" class="win-rate">--%</div>
+      <div id="win-detail" style="color:#888;font-size:13px;margin-top:6px;">Tỷ lệ chính xác</div>
+    </div>
+  </div>
+
+  <div class="history-wrap">
+    <div class="history-title">📋 Lịch sử</div>
+    <table>
+      <thead>
+        <tr><th>Phiên</th><th>Dự đoán</th><th>Kết quả</th><th>Đúng/Sai</th></tr>
+      </thead>
+      <tbody id="history-body">
+        <tr><td colspan="4" style="color:#555;padding:20px">Đang tải...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    const API = 'https://lc79md5-jade.vercel.app/api/predict';
+    let lastPhien = null;
+
+    async function fetchData() {
+      try {
+        const res = await fetch(API + '?_=' + Date.now());
+        const data = await res.json();
+        if (data.error) { document.getElementById('status').textContent = 'Lỗi: ' + data.error; return; }
+
+        // Cập nhật dự đoán
+        const pv = document.getElementById('predict-val');
+        pv.textContent = data.pendingPredict === 'TAI' ? 'TÀI' : 'XỈU';
+        pv.className = 'predict-val ' + (data.pendingPredict === 'TAI' ? 'tai' : 'xiu');
+        document.getElementById('pending-id').textContent = '#' + data.pendingId;
+        document.getElementById('algo-text').textContent = '🧠 ' + (data.pendingAlgo || '');
+        document.getElementById('reverse-warn').style.display = data.isReversing ? 'block' : 'none';
+
+        // Winrate
+        const history = data.history || [];
+        const correct = history.filter(h => h.isCorrect).length;
+        const total = history.length;
+        document.getElementById('win-rate').textContent = total > 0 ? ((correct/total)*100).toFixed(1) + '%' : '--%';
+        document.getElementById('win-detail').textContent = `Chính xác ${correct} / ${total} lệnh`;
+
+        // Status
+        if (data.currentPhien !== lastPhien) {
+          lastPhien = data.currentPhien;
+        }
+        document.getElementById('status').textContent = `Phiên hiện tại: #${data.currentPhien} · Kết quả: ${data.currentKetQua === 'TAI' ? 'Tài' : 'Xỉu'}`;
+
+        // Bảng lịch sử
+        const tbody = document.getElementById('history-body');
+        let rows = '';
+
+        // Hàng đang chờ
+        if (data.pendingId) {
+          const pred = data.pendingPredict;
+          const revBadge = data.isReversing ? '<span class="badge-rev">ĐẢO</span>' : '';
+          rows += `<tr class="current-row">
+            <td>${data.pendingId}</td>
+            <td class="${pred === 'TAI' ? 'tai' : 'xiu'}">${pred === 'TAI' ? 'Tài' : 'Xỉu'}${revBadge}</td>
+            <td class="waiting">⏳ ĐỢI...</td>
+            <td class="waiting">--</td>
+          </tr>`;
+        }
+
+        rows += history.map(h => {
+          const rev = h.wasReversed ? '<span class="badge-rev">ĐẢO</span>' : '';
+          return `<tr>
+            <td>${h.phien}</td>
+            <td class="${h.duDoan === 'TAI' ? 'tai' : 'xiu'}">${h.duDoan === 'TAI' ? 'Tài' : 'Xỉu'}${rev}</td>
+            <td class="${h.ketQua === 'TAI' ? 'tai' : 'xiu'}">${h.ketQua === 'TAI' ? 'Tài' : 'Xỉu'}</td>
+            <td class="${h.isCorrect ? 'dung' : 'sai'}">${h.isCorrect ? '✅ Đúng' : '❌ Sai'}</td>
+          </tr>`;
+        }).join('');
+
+        tbody.innerHTML = rows || '<tr><td colspan="4" style="color:#555;padding:20px">Chưa có dữ liệu</td></tr>';
+
+      } catch(e) {
+        document.getElementById('status').textContent = 'Lỗi kết nối: ' + e.message;
+      }
+    }
+
+    fetchData();
+    setInterval(fetchData, 3000);
+  </script>
+</body>
+</html>
