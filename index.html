@@ -135,6 +135,7 @@
     const BASE = 'https://lc79md5-jade.vercel.app';
     let lastPhien = null;
     let currentDuDoan = null;
+    let prevDuDoan = null;
     let history = [];
 
     // Load 50 phiên lịch sử từ server khi mở trang
@@ -164,6 +165,7 @@
         if (current.Phien !== lastPhien) {
           lastPhien = current.Phien;
           currentDuDoan = current.Du_doan;
+          prevDuDoan = current.Du_doan;
 
           // Reload history từ server
           await loadHistory();
