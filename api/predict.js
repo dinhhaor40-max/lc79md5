@@ -180,7 +180,7 @@ export default async function handler(req, res) {
       pendingAlgo,
       pendingConfidence,
       isReversing,
-      history: history.slice(0, 50),
+      history: history.slice(0, 200),
       currentPhien: latestPhien,
       currentKetQua: toTX(list[0].Ket_qua)
     });
