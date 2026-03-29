@@ -116,6 +116,26 @@ export default async function handler(req, res) {
     let isReversing = bin.isReversing || false;
     let changed = false;
 
+    // Backfill: nếu history trống thì tính đúng/sai cho toàn bộ lịch sử có sẵn
+    if (history.length === 0 && list.length >= 10) {
+      for (let i = list.length - 1; i >= 1; i--) {
+        const trainData = list.slice(i, Math.min(i + 200, list.length));
+        const ensemble = runEnsemble(trainData, history);
+        const actual = toTX(list[i - 1].Ket_qua);
+        history.unshift({
+          phien: list[i].Phien,
+          duDoan: ensemble.predict,
+          ketQua: actual,
+          isCorrect: ensemble.predict === actual,
+          wasReversed: ensemble.isReversing,
+          algo: ensemble.algo,
+          time: new Date().toISOString()
+        });
+        if (history.length >= 500) break;
+      }
+      changed = true;
+    }
+
     // Nếu phiên pending đã có kết quả
     if (pendingId && latestPhien >= pendingId) {
       const found = list.find(x => x.Phien === pendingId);
